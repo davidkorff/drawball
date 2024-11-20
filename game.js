@@ -141,24 +141,74 @@ function drawLines() {
 // Gyroscope/Desktop gravity handling
 let hasOrientationData = false;
 
-if (window.DeviceOrientationEvent) {
-    window.addEventListener('deviceorientation', (event) => {
-        if (event.beta !== null && event.gamma !== null) {
-            hasOrientationData = true;
-            handleOrientation(event);
+// Request device motion/orientation permission for iOS
+async function requestPermission() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && 
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+            // This is the iOS way to request permission
+            const permission = await DeviceOrientationEvent.requestPermission();
+            if (permission === 'granted') {
+                window.addEventListener('deviceorientation', handleOrientation);
+                console.log('Device orientation permission granted');
+            } else {
+                console.log('Device orientation permission denied');
+            }
+        } catch (error) {
+            console.error('Error requesting device orientation permission:', error);
         }
+    } else {
+        // Non-iOS devices don't need permission
+        window.addEventListener('deviceorientation', handleOrientation);
+        console.log('Device orientation available without permission');
+    }
+}
+
+// Add a button to request permission (iOS requires user interaction)
+function createPermissionButton() {
+    const button = document.createElement('button');
+    button.innerHTML = 'Enable Gyroscope';
+    button.style.position = 'fixed';
+    button.style.top = '20px';
+    button.style.left = '50%';
+    button.style.transform = 'translateX(-50%)';
+    button.style.padding = '10px 20px';
+    button.style.zIndex = '1000';
+    
+    button.addEventListener('click', () => {
+        requestPermission();
+        button.remove();
     });
+    
+    document.body.appendChild(button);
+}
+
+// Initialize gyroscope handling
+if (window.DeviceOrientationEvent) {
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ devices need the button
+        createPermissionButton();
+    } else {
+        // Other devices can start right away
+        window.addEventListener('deviceorientation', handleOrientation);
+    }
 } else {
     console.log('Device does not support gyroscope, using desktop mode');
 }
 
+// Update the orientation handler to be more responsive
 function handleOrientation(event) {
-    const beta = event.beta;
-    const gamma = event.gamma;
+    const beta = event.beta;  // Front/back tilt (-180 to 180)
+    const gamma = event.gamma; // Left/right tilt (-90 to 90)
 
     if (beta !== null && gamma !== null) {
-        engine.world.gravity.x = (gamma / 90) * 0.5;
-        engine.world.gravity.y = (beta / 90) * 0.5;
+        hasOrientationData = true;
+        
+        // Make gravity more responsive
+        engine.world.gravity.x = (gamma / 90) * 1; // Increased from 0.5 to 1
+        engine.world.gravity.y = (beta / 90) * 1;  // Increased from 0.5 to 1
+        
+        console.log('Gravity:', { x: engine.world.gravity.x, y: engine.world.gravity.y });
     }
 }
 
