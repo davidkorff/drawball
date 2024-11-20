@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Gyroscope Ball Game3</title>
+    <title>Gyroscope Ball Game4</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
@@ -12,14 +12,51 @@
         body {
             margin: 0;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
             min-height: 100vh;
             overflow: hidden;
         }
+        #controls {
+            position: fixed;
+            top: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+        }
+        .color-btn {
+            width: 30px;
+            height: 30px;
+            border: 2px solid #333;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .action-btn {
+            padding: 5px 15px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .action-btn:hover {
+            background: #45a049;
+        }
+        .selected {
+            transform: scale(1.2);
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
     </style>
 </head>
 <body>
+    <div id="controls">
+        <button class="color-btn" style="background-color: black;" data-color="black"></button>
+        <button class="color-btn" style="background-color: red;" data-color="red"></button>
+        <button class="color-btn" style="background-color: blue;" data-color="blue"></button>
+        <button class="color-btn" style="background-color: green;" data-color="green"></button>
+        <button class="action-btn" id="clearBtn">Clear</button>
+        <button class="action-btn" id="addBallBtn">Add Ball</button>
+    </div>
     <canvas id="gameCanvas"></canvas>
     <script src="game.js"></script>
 </body>

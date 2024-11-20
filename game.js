@@ -78,13 +78,14 @@ function endDrawing() {
     if (!isDrawing) return;
     isDrawing = false;
     if (currentLine.length > 1) {
-        // Create physics body for the line
+        // Store the color with the line
+        currentLine.color = currentColor;
+        
         const points = currentLine.map(p => ({ x: p.x, y: p.y }));
         for (let i = 1; i < points.length; i++) {
             const start = points[i - 1];
             const end = points[i];
             
-            // Calculate line properties
             const length = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
             const angle = Math.atan2(end.y - start.y, end.x - start.x);
             const center = {
@@ -92,18 +93,20 @@ function endDrawing() {
                 y: (start.y + end.y) / 2
             };
 
-            // Create line segment as static rectangle
-            if (length > 2) {  // Only create physics body if line segment is long enough
+            if (length > 2) {
                 const line = Bodies.rectangle(center.x, center.y, length, 5, {
                     isStatic: true,
                     angle: angle,
                     friction: 0,
-                    restitution: 0.7
+                    restitution: 0.7,
+                    render: {
+                        fillStyle: currentColor
+                    }
                 });
                 World.add(world, line);
+                lines.push(currentLine);
             }
         }
-        lines.push(currentLine);
     }
     currentLine = [];
 }
@@ -115,6 +118,8 @@ function drawLines() {
     lines.forEach(line => {
         ctx.beginPath();
         ctx.moveTo(line[0].x, line[0].y);
+        ctx.strokeStyle = line.color || 'black'; // Use stored color or default to black
+        ctx.lineWidth = 5;
         line.forEach(point => {
             ctx.lineTo(point.x, point.y);
         });
@@ -125,17 +130,21 @@ function drawLines() {
     if (currentLine.length > 0) {
         ctx.beginPath();
         ctx.moveTo(currentLine[0].x, currentLine[0].y);
+        ctx.strokeStyle = currentColor;
+        ctx.lineWidth = 5;
         currentLine.forEach(point => {
             ctx.lineTo(point.x, point.y);
         });
         ctx.stroke();
     }
 
-    // Draw ball
-    ctx.beginPath();
-    ctx.arc(ball.position.x, ball.position.y, ballRadius, 0, Math.PI * 2);
-    ctx.fillStyle = 'red';
-    ctx.fill();
+    // Draw all balls
+    balls.forEach(ball => {
+        ctx.beginPath();
+        ctx.arc(ball.position.x, ball.position.y, ballRadius, 0, Math.PI * 2);
+        ctx.fillStyle = ball.render.fillStyle || 'red';
+        ctx.fill();
+    });
 }
 
 // Gyroscope/Desktop gravity handling
@@ -216,23 +225,19 @@ async function initializeApp() {
     if (window.DeviceOrientationEvent) {
         if (typeof DeviceOrientationEvent.requestPermission === 'function') {
             try {
-                // iOS 13+ devices
                 const permission = await DeviceOrientationEvent.requestPermission();
-                console.log('Permission response:', permission);
-                
                 if (permission === 'granted') {
                     window.addEventListener('deviceorientation', handleOrientation);
                     console.log('Device orientation permission granted');
                 } else {
                     console.log('Device orientation permission denied');
+                    engine.world.gravity.y = 0.5; // Fallback to desktop mode
                 }
             } catch (error) {
                 console.error('Error requesting permission:', error);
-                // Fallback to desktop mode
-                engine.world.gravity.y = 0.5;
+                engine.world.gravity.y = 0.5; // Fallback to desktop mode
             }
         } else {
-            // Non-iOS devices or older iOS versions
             window.addEventListener('deviceorientation', handleOrientation);
             console.log('Permission not required for this device');
         }
@@ -276,4 +281,48 @@ window.addEventListener('resize', () => {
     ];
     World.add(world, newWalls);
     walls.push(...newWalls);
+});
+
+// Add these variables at the top with your other declarations
+let currentColor = 'black';
+const balls = [];
+
+// Add color selection functionality
+document.querySelectorAll('.color-btn').forEach(button => {
+    button.addEventListener('click', () => {
+        // Remove selected class from all buttons
+        document.querySelectorAll('.color-btn').forEach(btn => 
+            btn.classList.remove('selected'));
+        // Add selected class to clicked button
+        button.classList.add('selected');
+        currentColor = button.dataset.color;
+    });
+});
+
+// Add clear button functionality
+document.getElementById('clearBtn').addEventListener('click', () => {
+    // Remove all lines
+    lines.forEach(line => {
+        World.remove(world, line);
+    });
+    lines.length = 0;
+    currentLine = [];
+});
+
+// Add ball button functionality
+document.getElementById('addBallBtn').addEventListener('click', () => {
+    const newBall = Bodies.circle(
+        canvas.width / 2,
+        canvas.height / 2,
+        ballRadius,
+        {
+            restitution: 0.7,
+            friction: 0.001,
+            render: {
+                fillStyle: currentColor
+            }
+        }
+    );
+    balls.push(newBall);
+    World.add(world, newBall);
 }); 
