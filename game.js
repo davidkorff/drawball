@@ -141,76 +141,112 @@ function drawLines() {
 // Gyroscope/Desktop gravity handling
 let hasOrientationData = false;
 
-// Request device motion/orientation permission for iOS
-async function requestPermission() {
-    if (typeof DeviceOrientationEvent !== 'undefined' && 
-        typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-            // This is the iOS way to request permission
-            const permission = await DeviceOrientationEvent.requestPermission();
-            if (permission === 'granted') {
-                window.addEventListener('deviceorientation', handleOrientation);
-                console.log('Device orientation permission granted');
-            } else {
-                console.log('Device orientation permission denied');
-            }
-        } catch (error) {
-            console.error('Error requesting device orientation permission:', error);
-        }
-    } else {
-        // Non-iOS devices don't need permission
-        window.addEventListener('deviceorientation', handleOrientation);
-        console.log('Device orientation available without permission');
-    }
+// Add this function to detect iPad
+function isIPad() {
+    return (
+        navigator.maxTouchPoints &&
+        navigator.maxTouchPoints > 2 &&
+        /MacIntel/.test(navigator.platform)
+    ) || /iPad/.test(navigator.userAgent);
 }
 
-// Add a button to request permission (iOS requires user interaction)
-function createPermissionButton() {
-    const button = document.createElement('button');
-    button.innerHTML = 'Enable Gyroscope';
-    button.style.position = 'fixed';
-    button.style.top = '20px';
-    button.style.left = '50%';
-    button.style.transform = 'translateX(-50%)';
-    button.style.padding = '10px 20px';
-    button.style.zIndex = '1000';
-    
-    button.addEventListener('click', () => {
-        requestPermission();
-        button.remove();
-    });
-    
-    document.body.appendChild(button);
+// Add this function to detect device type
+function getDeviceType() {
+    const iPad = isIPad();
+    const iOS = /iPhone|iPod/.test(navigator.userAgent);
+    return {
+        isIPad: iPad,
+        isIOS: iOS,
+        isMobile: iPad || iOS
+    };
 }
 
-// Initialize gyroscope handling
-if (window.DeviceOrientationEvent) {
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS 13+ devices need the button
-        createPermissionButton();
-    } else {
-        // Other devices can start right away
-        window.addEventListener('deviceorientation', handleOrientation);
-    }
-} else {
-    console.log('Device does not support gyroscope, using desktop mode');
-}
-
-// Update the orientation handler to be more responsive
+// Update the orientation handler for iPad
 function handleOrientation(event) {
-    const beta = event.beta;  // Front/back tilt (-180 to 180)
+    const beta = event.beta;   // Front/back tilt (-180 to 180)
     const gamma = event.gamma; // Left/right tilt (-90 to 90)
+    const alpha = event.alpha; // Compass direction (0 to 360)
+    
+    console.log('Orientation:', { beta, gamma, alpha });
 
     if (beta !== null && gamma !== null) {
         hasOrientationData = true;
         
-        // Make gravity more responsive
-        engine.world.gravity.x = (gamma / 90) * 1; // Increased from 0.5 to 1
-        engine.world.gravity.y = (beta / 90) * 1;  // Increased from 0.5 to 1
+        let gravityX, gravityY;
         
-        console.log('Gravity:', { x: engine.world.gravity.x, y: engine.world.gravity.y });
+        if (isIPad()) {
+            // Adjusted values for iPad
+            gravityX = (gamma / 45) * 1.5; // More sensitive
+            gravityY = (beta / 45) * 1.5;  // More sensitive
+            
+            // Handle different iPad orientations
+            if (window.orientation === 0) { // Portrait
+                engine.world.gravity.x = gravityX;
+                engine.world.gravity.y = gravityY;
+            } else if (window.orientation === 90) { // Landscape right
+                engine.world.gravity.x = -gravityY;
+                engine.world.gravity.y = gravityX;
+            } else if (window.orientation === -90) { // Landscape left
+                engine.world.gravity.x = gravityY;
+                engine.world.gravity.y = -gravityX;
+            } else if (window.orientation === 180) { // Upside down
+                engine.world.gravity.x = -gravityX;
+                engine.world.gravity.y = -gravityY;
+            }
+        } else {
+            // Original values for iPhone and other devices
+            engine.world.gravity.x = (gamma / 90) * 1;
+            engine.world.gravity.y = (beta / 90) * 1;
+        }
+        
+        console.log('Device:', getDeviceType());
+        console.log('Orientation:', window.orientation);
+        console.log('Gravity:', { 
+            x: engine.world.gravity.x, 
+            y: engine.world.gravity.y 
+        });
     }
 }
+
+// Initialize the application
+async function initializeApp() {
+    console.log('Initializing app...');
+    console.log('Device type:', getDeviceType());
+
+    if (window.DeviceOrientationEvent) {
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            try {
+                // iOS 13+ devices
+                const permission = await DeviceOrientationEvent.requestPermission();
+                console.log('Permission response:', permission);
+                
+                if (permission === 'granted') {
+                    window.addEventListener('deviceorientation', handleOrientation);
+                    console.log('Device orientation permission granted');
+                } else {
+                    console.log('Device orientation permission denied');
+                }
+            } catch (error) {
+                console.error('Error requesting permission:', error);
+                // Fallback to desktop mode
+                engine.world.gravity.y = 0.5;
+            }
+        } else {
+            // Non-iOS devices or older iOS versions
+            window.addEventListener('deviceorientation', handleOrientation);
+            console.log('Permission not required for this device');
+        }
+    } else {
+        console.log('Device does not support gyroscope, using desktop mode');
+        engine.world.gravity.y = 0.5;
+    }
+
+    // Start the game loop
+    gameLoop();
+}
+
+// Start everything when the page loads
+window.addEventListener('load', initializeApp);
 
 // Game loop
 function gameLoop() {
@@ -223,9 +259,6 @@ function gameLoop() {
     
     requestAnimationFrame(gameLoop);
 }
-
-// Start the game
-gameLoop();
 
 // Handle window resize
 window.addEventListener('resize', () => {
